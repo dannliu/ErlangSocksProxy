@@ -15,9 +15,14 @@
 -define(CONNECTED, connected).
 
 start_socks() ->
+    info_msg("started"),
     start_socks(1090).
 
+start_socks([Port|_]) ->
+    start_socks(list_to_integer(Port));
+    
 start_socks(Port) ->
+    info_msg("Port = ~p~n", [Port]),
     init(),
     {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0}]),
     case Result of

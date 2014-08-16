@@ -1,11 +1,5 @@
 %% Start a server to listen on port 1080, which later will establish connection from  SOCKS client
 
-
-%% T represent the state of the sock connection, init -> hello -> reply
-
-%% Todo: Add cache for the domain host
-%% Add expired time to the IP cache
-
 -module(entry).
 -export([start_socks/0,start_socks/1]).
 -import(error_logger,[info_msg/1,info_msg/2,error_msg/1,error_msg/2]).
@@ -14,8 +8,9 @@
 -define(HELLO, hello).
 -define(CONNECTED, connected).
 -define(STOP, stop).
--define(SOCKS_PORT,1090).
+-define(SOCKS_PORT,1080).
 -define(CONNECTION_TIMEOUT, 20000).
+-define(CACHE_EXPIRED,3600).
 
 -type state() :: init|hello|connected.
 
@@ -227,7 +222,7 @@ get_ip(Host) ->
         {Pid, {IP, Time}} ->
             CurrentTime = tis(),
             if 
-                CurrentTime - Time > 30 ->
+                CurrentTime - Time > CACHE_EXPIRED ->
                     Pid ! {'remove', Host},
                     undefined;
                true -> IP

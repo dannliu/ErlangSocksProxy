@@ -13,16 +13,32 @@
 -define(INIT, init).
 -define(HELLO, hello).
 -define(CONNECTED, connected).
+-define(SOCKS_PORT,douban).
+
+-type state() :: init|hello|connected.
+
+-spec loop(LocalSocket, State, RemoteSocket) -> any() when
+    LocalSocket :: gen_tcp:socket(),
+    State :: state(),
+    RemoteSocket :: gen_tcp:socket().
+
+-spec handle_connection_request(LocalSocket, RemoteSocket, State, Packet) -> {state(),gen_tcp:socket()} when
+    LocalSocket :: gen_tcp:socket(),
+    RemoteSocket :: gen_tcp:socket(),
+    State :: state(),
+    Packet :: binary().
 
 start_socks() ->
-    info_msg("started"),
-    start_socks(1090).
+    start_socks(?SOCKS_PORT).
 
 start_socks([Port|_]) ->
-    start_socks(list_to_integer(Port));
+    try
+        start_socks(list_to_integer(Port))
+    catch
+        error:Reason -> error_msg("start socks proxy failed, reason = ~p~n",[Reason])
+    end;
     
 start_socks(Port) ->
-    info_msg("Port = ~p~n", [Port]),
     init(),
     {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0}]),
     case Result of
@@ -40,16 +56,10 @@ new_connection(Listen) ->
     spawn(fun() -> loop(Socket, ?INIT, undefined) end),
     new_connection(Listen).
 
-%% LS: Local socket which connect to the browser or client
-%% ST: Session State
-%% RS: Remote Socket which connect to the desired destination which browser or client want to connect.
-
 loop(LS, ST, RS) ->
-    %%io:format("start to receive data from socket ~p, state = ~p~n", [S, T]),
     {Result, Packet} = gen_tcp:recv(LS, 0, infinity),
     case Result of
         ok -> 
-            %%io:format("received data  = ~p~n",[Data]),
             {State, RemoteSocket} = handle_connection_request(LS, RS, ST, Packet),
             loop(LS, State, RemoteSocket);
         error -> io:format("loop, Reason = ~p~n",[Packet]),gen_tcp:close(LS)
@@ -57,19 +67,19 @@ loop(LS, ST, RS) ->
 
 handle_connection_request(LS, RS, ST, Packet) ->
     case ST of
-        ?INIT -> handle_init_request(LS, Packet);
-        ?HELLO -> handle_hello_request(LS, Packet);
+        ?INIT      -> handle_init_request(LS, Packet);
+        ?HELLO     -> handle_hello_request(LS, Packet);
         ?CONNECTED -> handle_reply_request(RS, Packet);
         _Any -> io:format("Error for handle connection request"), error
     end.
 
 handle_init_request(LS, Packet) ->
-    send_data(LS, <<5, 0>>),
+    send_packet(LS, <<5, 0>>),
     {?HELLO, undefined}.
 
 handle_hello_request(LS, Packet) ->
     %%fetch the remote addr and remote port from the data.
-    send_data(LS, <<5,0,0,1,0,0,0,0,16,16>>),
+    send_packet(LS, <<5,0,0,1,0,0,0,0,16,16>>),
     {Addr, Port} = parse_destination_addr(Packet),
     %%todo connection may be failed here, do we need to reconnect?
     {Result, RS} = gen_tcp:connect(Addr, trs_port(Port),[binary, {active,false}, {packet,0}]),
@@ -77,14 +87,11 @@ handle_hello_request(LS, Packet) ->
     {?CONNECTED, RS}.
 
 handle_reply_request(RS, Packet) ->
-    send_data(RS, Packet), 
+    send_packet(RS, Packet), 
     {?CONNECTED, RS}. 
 
 handle_remote_data(RS, LS) ->
-    %%io:format("Start to fetch data from actual sever ~p ~p ~p ~n",[Addr, Port, RequestData]),
-    %%gen_tcp:send(RS,binary_to_list(RequestPacket)),
     {Result, Packet} = gen_tcp:recv(RS,0,infinity),
-    %%io:format("The data return by the remote server ~p~n",[Data]),
     case Result of
         ok -> 
             send_to_local(LS, Packet),
@@ -109,27 +116,27 @@ send_to_local(LS, Packet) ->
 async_send_to_local() ->
     receive
         {ok, LS, Packet} -> 
-            send_data(LS, Packet),
+            send_packet(LS, Packet),
             async_send_to_local()
     end.
 
 
-send_data(Socket,Data) ->
-    gen_tcp:send(Socket,Data).
+send_packet(Socket,Packet) ->
+    gen_tcp:send(Socket,Packet).
 
 
-parse_destination_addr(Data) ->
-    <<_:3/binary,T,_/binary>> = Data,
+parse_destination_addr(Packet) ->
+    <<_:3/binary,T,_/binary>> = Packet,
     %%io:format("The type of request destination is ~B~n",[T]),
     case T of
        16#01 -> 
-            <<_:3/binary,T,Addr:4/binary,Port:2/binary>> = Data, 
+            <<_:3/binary,T,Addr:4/binary,Port:2/binary>> = Packet, 
             {list_to_tuple(Addr), Port};
        16#03 ->
-            <<_:3/binary,T,N,URL:N/binary,Port:2/binary>> = Data,
+            <<_:3/binary,T,N,URL:N/binary,Port:2/binary>> = Packet,
             {url_to_ip(binary_to_list(URL)), Port};
        16#04 ->
-            <<_:3/binary,T,Addr:16/binary,Port:2/binary>> = Data,
+            <<_:3/binary,T,Addr:16/binary,Port:2/binary>> = Packet,
             {list_to_tuple(Addr), Port}
     end.
 

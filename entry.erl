@@ -1,5 +1,9 @@
 %% Start a server to listen on port 1080, which later will establish connection from  SOCKS client
 
+%% TODO Support authentication
+%% TODO Support UDP
+%% TODO Support Bind
+
 -module(entry).
 -export([start_socks/0,start_socks/1]).
 -import(error_logger,[info_msg/1,info_msg/2,error_msg/1,error_msg/2]).
@@ -11,6 +15,9 @@
 -define(SOCKS_PORT,1080).
 -define(CONNECTION_TIMEOUT, 20000).
 -define(CACHE_EXPIRED,3600).
+-define(CACHE_GET, 'get').
+-define(CACHE_SAVE, save).
+-define(CACHE_REMOVE, remove).
 
 -type state() :: init|hello|connected.
 
@@ -40,7 +47,7 @@ start_socks(Port) ->
     {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0}, {send_timeout,?CONNECTION_TIMEOUT}]),
     case Result of
         ok ->  new_connection(Listen);
-        error -> io:format("ERROR, failed to listen on port ~p as ~p",[Port,Listen])
+        error -> error_msg("ERROR, failed to listen on port ~p as ~p",[Port,Listen])
     end.
 
 %% Initialize the Host to IP cache
@@ -52,12 +59,13 @@ new_connection(Listen) ->
     {Result, Socket} = gen_tcp:accept(Listen),
     case Result of
         ok -> 
-            spawn(fun() -> loop(Socket, ?INIT, undefined) end),
-            new_connection(Listen);
+            spawn(fun() -> loop(Socket, ?INIT, undefined) end);
         error ->
             error_msg("Failed to accept a connection , Reason = ~p~n", Socket)
-    end.
+    end,
+    new_connection(Listen).
 
+%%The main loop for a single local socket
 loop(LS, ST, RS) ->
     {Result, Packet} = gen_tcp:recv(LS, 0, infinity),
     case Result of
@@ -159,7 +167,6 @@ send_packet(Socket,Packet) ->
 
 parse_destination_addr(Packet) ->
     <<_:3/binary,T,_/binary>> = Packet,
-    %%io:format("The type of request destination is ~B~n",[T]),
     case T of
        16#01 -> 
             <<_:3/binary,T,Addr:4/binary,Port:2/binary>> = Packet, 
@@ -173,7 +180,6 @@ parse_destination_addr(Packet) ->
     end.
 
 url_to_ip(URL) ->
-    %%io:format("The URL = ~p need to transfer to ip ~n", [URL]),
     IP = get_ip(URL),
     case IP of
         undefined ->
@@ -184,7 +190,7 @@ url_to_ip(URL) ->
                     store_ip(URL, Addr),
                     Addr;
                 error ->
-                    io:format("Failed to get ip address, URL = ~p",[URL]),
+                    error_msg("Failed to get ip address, URL = ~p",[URL]),
                     {{},0}
             end;
         IP -> IP
@@ -198,32 +204,32 @@ trs_port(Port) ->
 
 ip_cache(IP_map) ->
     receive
-        {'get',Host, Pid} -> 
+        {?CACHE_GET,Host, Pid} -> 
             IP = maps:get(Host,IP_map,undefined),
             Pid ! {self(), IP},
             ip_cache(IP_map);
-        {'remove', Host} ->
+        {?CACHE_SAVE, Host} ->
             M2 = maps:remove(Host, IP_map),
             ip_cache(M2);
-        {'cache', Host, IP} ->
+        {?CACHE_SAVE, Host, IP} ->
             M2 = maps:put(Host,{IP, tis()},IP_map),
             ip_cache(M2)
     end.
 
 store_ip(Host, IP) ->
     Pid = whereis(cache),
-    Pid ! {'cache',Host, IP}.
+    Pid ! {?CACHE_SAVE,Host, IP}.
 
 get_ip(Host) ->
     Pid = whereis(cache),
-    Pid ! {'get', Host , self()},
+    Pid ! {?CACHE_GET, Host , self()},
     receive
         {Pid,undefined} -> undefined;
         {Pid, {IP, Time}} ->
             CurrentTime = tis(),
             if 
-                CurrentTime - Time > CACHE_EXPIRED ->
-                    Pid ! {'remove', Host},
+                CurrentTime - Time > ?CACHE_EXPIRED ->
+                    Pid ! {?CACHE_REMOVE, Host},
                     undefined;
                true -> IP
             end;

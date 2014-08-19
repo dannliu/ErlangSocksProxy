@@ -84,10 +84,11 @@ loop(LS, ST, RS) ->
     end.
 
 handle_connection_request(LS, RS, ST, Packet) ->
+    P = trs_packet(Packet),
     case ST of
-        ?INIT      -> handle_init_request(LS, Packet);
-        ?HELLO     -> handle_hello_request(LS, Packet);
-        ?CONNECTED -> handle_reply_request(RS, Packet)
+        ?INIT      -> handle_init_request(LS, P);
+        ?HELLO     -> handle_hello_request(LS, P);
+        ?CONNECTED -> handle_reply_request(RS, P)
     end.
 
 handle_init_request(LS, Packet) ->
@@ -166,7 +167,6 @@ send_packet(Socket,Packet) ->
 
 
 parse_destination_addr(Packet) ->
-    info_msg("Packet = ~p~n",[Packet]),
     <<_:3/binary,T,_/binary>> = Packet,
     case T of
        16#01 -> 
@@ -239,3 +239,6 @@ get_ip(Host) ->
 
 tis() ->
     calendar:datetime_to_gregorian_seconds(calendar:local_time()).
+
+trs_packet(Packet) ->
+    << <<bnot X>> || <<X>> <= Packet >>.

@@ -4,15 +4,14 @@
 %% TODO Support UDP
 %% TODO Support Bind
 
--module(entry).
--export([start_socks/0,start_socks/1]).
+-module(gfw_socks).
+-export([start/0]).
 -import(error_logger,[info_msg/1,info_msg/2,error_msg/1,error_msg/2]).
 
 -define(INIT, init).
 -define(HELLO, hello).
 -define(CONNECTED, connected).
 -define(STOP, stop).
--define(SOCKS_PORT,1080).
 -define(CONNECTION_TIMEOUT, 20000).
 -define(CACHE_EXPIRED,3600).
 -define(CACHE_GET, 'get').
@@ -32,16 +31,10 @@
     State :: state(),
     Packet :: binary().
 
-start_socks() ->
-    start_socks(?SOCKS_PORT).
+start() ->
+    {ok,[{server_port, Port,_,_,_,_}]} = file:consult("gfw_socks.config"),
+    start_socks(Port).
 
-start_socks([Port|_]) ->
-    try
-        start_socks(list_to_integer(Port))
-    catch
-        error:Reason -> error_msg("start socks proxy failed, reason = ~p~n",[Reason])
-    end;
-    
 start_socks(Port) ->
     init(),
     {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0}, {send_timeout,?CONNECTION_TIMEOUT}]),
@@ -92,8 +85,14 @@ handle_connection_request(LS, RS, ST, Packet) ->
     end.
 
 handle_init_request(LS, Packet) ->
-    send_packet(LS, <<5, 0>>),
-    {?HELLO, undefined}.
+    <<Version:1/binary,_/binary>> = Packet,
+    case Version of
+        %%Only support socks5 now
+        <<5>> -> 
+            send_packet(LS, <<5, 0>>),
+            {?HELLO, undefined};
+        _Any -> {?STOP, undefined}
+    end.
 
 handle_hello_request(LS, Packet) ->
     %%fetch the remote addr and remote port from the data.

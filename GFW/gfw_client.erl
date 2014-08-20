@@ -2,18 +2,16 @@
 %% The client will encry the data browser or any end application send to the proxy,
 %% then forward to the socks proxy server
 
--module(ch_client).
+-module(gfw_client).
 
--define(LOCAL_PORT, 1090).
--define(PROXY_IP, {58,96,173,81}).
--define(PROXY_PORT, 1080).
 -define(TIME_OUT, 20000).
 
 -import(error_logger, [error_msg/1, error_msg/2, info_msg/1, info_msg/2]).
 -export([start/0,start/1,handle_connection/1,handle_connection/2,handle_remote_connection/2]).
 
 start() ->
-    start(?LOCAL_PORT). 
+    {ok,[{_, _,_,_,local_port,Port}]} = file:consult("gfw_socks.config"),
+    start(Port). 
 
 start(Port) ->
     {Result, Socket} = gen_tcp:listen(Port, [binary, {active, false}]),
@@ -32,7 +30,8 @@ new_connection(ListenSocket) ->
     end.
 
 handle_connection(Socket) ->
-    {Result, RemoteSocket} = gen_tcp:connect(?PROXY_IP, ?PROXY_PORT, [binary, {active, false}, {send_timeout, ?TIME_OUT}], ?TIME_OUT),
+    {ok,[{server_port, PROXY_PORT,server_ip,PROXY_IP,_,_}]} = file:consult("gfw_socks.config"),
+    {Result, RemoteSocket} = gen_tcp:connect(PROXY_IP, PROXY_PORT, [binary, {active, false}, {send_timeout, ?TIME_OUT}], ?TIME_OUT),
     case Result of
         ok -> 
             spawn(?MODULE, handle_remote_connection, [RemoteSocket, Socket]),
@@ -69,6 +68,4 @@ handle_remote_connection(RemoteSocket, Socket) ->
                 _Any -> error_msg("Receive data error, Reason = ~p~n",[Packet])
             end
     end.
-
-    
     

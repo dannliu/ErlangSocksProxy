@@ -1,11 +1,12 @@
 Erlang Socks proxy
 ==================
-An Socks proxy for erlang
+An Socks proxy for erlang.
 
 Please note that:
+1. You should have a server to set up the proxy :).
 
-1. Only support **socks5**           (will support socks4 soon)
-2. Only support **TCP**              (will support UDP soon)
+2. Only support **socks5**           (will support socks4 soon)
+3. Only support **TCP**              (will support UDP soon)
 
 
 User Guide

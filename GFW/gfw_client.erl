@@ -42,7 +42,7 @@ handle_connection(Socket) ->
     end.
 
 handle_connection(Socket, RemoteSocket) ->
-    {Result, Packet} = gen_tcp:recv(Socket, 0, ?TIME_OUT),
+    {Result, Packet} = gen_tcp:recv(Socket, 0, infinity),
     case Result of
         ok ->
             EncryptedPacket = << <<bnot X>> || <<X>> <= Packet>>,
@@ -51,12 +51,13 @@ handle_connection(Socket, RemoteSocket) ->
         error ->
             case Packet of
                 closed -> ok;
-                _Any -> error_msg("Receive data error, Reason = ~p~n",[Packet])
+                _Any -> 
+                    error_msg("Local Receive data error, Reason = ~p~n",[Packet])
             end
     end.
 
 handle_remote_connection(RemoteSocket, Socket) ->
-    {Result, Packet} = gen_tcp:recv(RemoteSocket, 0, ?TIME_OUT),
+    {Result, Packet} = gen_tcp:recv(RemoteSocket, 0, infinity),
     %%Decryt the data
     case Result of
         ok ->
@@ -65,7 +66,7 @@ handle_remote_connection(RemoteSocket, Socket) ->
         error ->
             case Packet of
                 closed -> ok;
-                _Any -> error_msg("Receive data error, Reason = ~p~n",[Packet])
+                _Any -> error_msg("Remote Receive data error, Reason = ~p~n",[Packet])
             end
     end.
     

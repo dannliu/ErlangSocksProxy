@@ -39,4 +39,6 @@ Erlang was designed from the bottom up to program concurrent, distributed, fault
 
 Refer to the home page for more information: http://erlang.org
 
+Thansk
+
 

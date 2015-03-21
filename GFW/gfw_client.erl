@@ -10,8 +10,7 @@
 -export([start/0,start/1,handle_connection/1,handle_connection/2,handle_remote_connection/2]).
 
 start() ->
-    {ok,[{_, _,_,_,local_port,Port}]} = file:consult("gfw_socks.config"),
-    start(Port). 
+    start(1090). 
 
 start(Port) ->
     {Result, Socket} = gen_tcp:listen(Port, [binary, {active, false}]),
@@ -30,8 +29,7 @@ new_connection(ListenSocket) ->
     end.
 
 handle_connection(Socket) ->
-    {ok,[{server_port, PROXY_PORT,server_ip,PROXY_IP,_,_}]} = file:consult("gfw_socks.config"),
-    {Result, RemoteSocket} = gen_tcp:connect(PROXY_IP, PROXY_PORT, [binary, {active, false}, {send_timeout, ?TIME_OUT}], ?TIME_OUT),
+    {Result, RemoteSocket} = gen_tcp:connect("58.96.173.81", 1080, [binary, {active, false}, {send_timeout, ?TIME_OUT}], ?TIME_OUT),
     case Result of
         ok -> 
             spawn(?MODULE, handle_remote_connection, [RemoteSocket, Socket]),

@@ -1,3 +1,3 @@
 #!/bin/sh
-erlc gfw_client.erl
-erl -noshell -s gfw_client start
+erlc /Users/dyun/Program/GitHub/ERLSocks/GFW/gfw_client.erl
+erl -noshell -s gfw_client start -detached

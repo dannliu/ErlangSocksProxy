@@ -98,6 +98,7 @@ handle_hello_request(LS, Packet) ->
     %%fetch the remote addr and remote port from the data.
     send_packet(LS, <<5,0,0,1,0,0,0,0,16,16>>),
     {Addr, Port} = parse_destination_addr(Packet),
+    info_msg("Start to listen on ~p : ~p~n",[Addr,trs_port(Port)]),
     {Result, RS} = gen_tcp:connect(Addr, trs_port(Port),[binary, {active,false}, {packet,0},{send_timeout, ?CONNECTION_TIMEOUT}], ?CONNECTION_TIMEOUT),
     case Result of
         ok ->

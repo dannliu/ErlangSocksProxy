@@ -13,7 +13,7 @@ start() ->
     start(1090). 
 
 start(Port) ->
-    {Result, Socket} = gen_tcp:listen(Port, [binary, {active, false}]),
+    {Result, Socket} = gen_tcp:listen(Port, [binary, {active, false},{reuseaddr,true}]),
     case Result of 
         ok -> new_connection(Socket);
         error -> error_msg("Faile to the listen to the port = ~p, Reason = ~p~n",[Port, Socket])

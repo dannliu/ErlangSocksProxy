@@ -37,7 +37,7 @@ start() ->
 
 start_socks(Port) ->
     init(),
-    {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0}, {send_timeout,?CONNECTION_TIMEOUT}]),
+    {Result, Listen} = gen_tcp:listen(Port,[binary,{active,false},{packet,0},{reuseaddr,true}, {send_timeout,?CONNECTION_TIMEOUT}]),
     case Result of
         ok ->  new_connection(Listen);
         error -> error_msg("ERROR, failed to listen on port ~p as ~p",[Port,Listen])

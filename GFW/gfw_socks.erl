@@ -123,6 +123,7 @@ handle_remote_data(RS, LS) ->
             handle_remote_data(RS, LS);
         error -> 
             gen_tcp:close(RS),
+            close_local_socket(LS),
             case Packet of
                 closed -> ok;
                 _Any -> error_msg("Failed to retrieve data from remote ~p, Reason = ~p~n",[Addr,Packet])
@@ -131,11 +132,12 @@ handle_remote_data(RS, LS) ->
 
 close_local_socket(LS) ->
     Pid = get(LS),
-    gen_tcp:close(LS),
     case Pid of
-        undefined -> ok;
+        undefined ->
+            gen_tcp:close(LS),
+            ok;
         _Any ->
-            Pid ! close
+            Pid ! {close, LS}
     end.
 
 
@@ -158,7 +160,11 @@ async_send_to_local() ->
         {ok, LS, Packet} -> 
             send_packet(LS, Packet),
             async_send_to_local();
-        close -> close
+        {close, LS} -> 
+            gen_tcp:close(LS),
+            close;
+        _Any ->
+            close
     end.
 
 
